@@ -1,9 +1,11 @@
 import asyncio
 import hashlib
 import hmac
+import json
 from copy import copy
 from unittest import TestCase
 from unittest.mock import MagicMock
+from urllib.parse import urlencode
 
 from typing_extensions import Awaitable
 
@@ -49,3 +51,71 @@ class MexcAuthTests(TestCase):
         self.assertEqual(now * 1e3, configured_request.params["timestamp"])
         self.assertEqual(expected_signature, configured_request.params["signature"])
         self.assertEqual({"X-MEXC-APIKEY": self._api_key, "Content-Type": "application/json"}, configured_request.headers)
+
+    def test_rest_authenticate_with_special_characters_in_values(self):
+        now = 1234567890.000
+        mock_time_provider = MagicMock()
+        mock_time_provider.time.return_value = now
+
+        params = {
+            "symbol": "GOLD(XAUT)USDC",
+            "side": "BUY",
+            "type": "MARKET",
+            "quantity": 1,
+        }
+        full_params = copy(params)
+
+        auth = MexcAuth(api_key=self._api_key, secret_key=self._secret, time_provider=mock_time_provider)
+        request = RESTRequest(method=RESTMethod.POST, data=json.dumps(params), is_auth_required=True)
+        configured_request = self.async_run_with_timeout(auth.rest_authenticate(request))
+
+        full_params.update({"timestamp": 1234567890000})
+        encoded_params = urlencode(full_params)
+        expected_signature = hmac.new(
+            self._secret.encode("utf-8"),
+            encoded_params.encode("utf-8"),
+            hashlib.sha256).hexdigest()
+        expected_body = f"{encoded_params}&signature={expected_signature}"
+        self.assertEqual(expected_body, configured_request.data)
+        self.assertEqual({"X-MEXC-APIKEY": self._api_key, "Content-Type": "application/json"}, configured_request.headers)
+
+    def test_rest_authenticate_post_without_payload_adds_signed_body(self):
+        now = 1234567890.000
+        mock_time_provider = MagicMock()
+        mock_time_provider.time.return_value = now
+
+        auth = MexcAuth(api_key=self._api_key, secret_key=self._secret, time_provider=mock_time_provider)
+        request = RESTRequest(method=RESTMethod.POST, is_auth_required=True)
+        configured_request = self.async_run_with_timeout(auth.rest_authenticate(request))
+
+        expected_signature = hmac.new(
+            self._secret.encode("utf-8"),
+            "timestamp=1234567890000".encode("utf-8"),
+            hashlib.sha256).hexdigest()
+        self.assertEqual(now * 1e3, configured_request.data["timestamp"])
+        self.assertEqual(expected_signature, configured_request.data["signature"])
+        self.assertIsNone(configured_request.params)
+        self.assertEqual({"X-MEXC-APIKEY": self._api_key, "Content-Type": "application/json"}, configured_request.headers)
+
+    def test_rest_authenticate_get_with_special_characters_in_values(self):
+        now = 1234567890.000
+        mock_time_provider = MagicMock()
+        mock_time_provider.time.return_value = now
+
+        params = {
+            "symbol": "GOLD(XAUT)USDC",
+            "limit": 100,
+        }
+        full_params = copy(params)
+
+        auth = MexcAuth(api_key=self._api_key, secret_key=self._secret, time_provider=mock_time_provider)
+        request = RESTRequest(method=RESTMethod.GET, params=params, is_auth_required=True)
+        configured_request = self.async_run_with_timeout(auth.rest_authenticate(request))
+
+        full_params.update({"timestamp": 1234567890000})
+        encoded_params = "symbol=GOLD%28XAUT%29USDC&limit=100&timestamp=1234567890000"
+        expected_signature = hmac.new(
+            self._secret.encode("utf-8"),
+            encoded_params.encode("utf-8"),
+            hashlib.sha256).hexdigest()
+        self.assertEqual(expected_signature, configured_request.params["signature"])

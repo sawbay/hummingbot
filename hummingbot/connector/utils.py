@@ -2,6 +2,7 @@ import gzip
 import json
 import os
 import platform
+import re
 from collections import namedtuple
 from hashlib import md5
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -64,8 +65,14 @@ def get_new_client_order_id(
     """
     side = "B" if is_buy else "S"
     symbols = split_hb_trading_pair(trading_pair)
-    base = symbols[0].upper()
-    quote = symbols[1].upper()
+    base = re.sub(r"[^A-Z0-9]", "", symbols[0].upper())
+    quote = re.sub(r"[^A-Z0-9]", "", symbols[1].upper())
+
+    # Some markets use human-readable aliases like GOLD(XAUT), which can introduce
+    # punctuation into the generated client order id if we use raw token letters.
+    # Keep the id exchange-safe by folding each token down to alphanumeric chars.
+    base = base or "X"
+    quote = quote or "X"
     base_str = f"{base[0]}{base[-1]}"
     quote_str = f"{quote[0]}{quote[-1]}"
     client_instance_id = _bot_instance_id()

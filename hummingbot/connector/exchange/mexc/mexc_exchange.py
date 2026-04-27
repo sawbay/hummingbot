@@ -188,7 +188,7 @@ class MexcExchange(ExchangePyBase):
         try:
             order_result = await self._api_post(
                 path_url=CONSTANTS.ORDER_PATH_URL,
-                data=api_params,
+                params=api_params,
                 is_auth_required=True)
             o_id = str(order_result["orderId"])
             transact_time = float(order_result["transactTime"]) * 1e-3

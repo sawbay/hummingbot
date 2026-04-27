@@ -22,15 +22,27 @@ class MexcAuth(AuthBase):
         the required parameter in the request header.
         :param request: the request to be configured for authenticated interaction
         """
-        if request.method == RESTMethod.POST:
-            request.data = self.add_auth_to_params(params=json.loads(request.data) if request.data is not None else {})
-        else:
-            request.params = self.add_auth_to_params(params=request.params)
+        if request.method in [RESTMethod.POST, RESTMethod.PUT, RESTMethod.DELETE] and request.data is not None:
+            # Move data to params for MEXC as it is more stable and often required for V3
+            try:
+                data_params = json.loads(request.data)
+                if isinstance(data_params, dict):
+                    params = dict(request.params) if request.params is not None else {}
+                    params.update(data_params)
+                    request.params = params
+                    request.data = None
+            except Exception:
+                pass
+
+        request.params = self.add_auth_to_params(params=request.params, encode_params=True)
 
         headers = {}
         if request.headers is not None:
             headers.update(request.headers)
-        headers.update(self.header_for_authentication())
+        headers["X-MEXC-APIKEY"] = self.api_key
+        if request.data is not None:
+            headers["Content-Type"] = "application/json"
+
         request.headers = headers
 
         return request
@@ -43,22 +55,22 @@ class MexcAuth(AuthBase):
         return request  # pass-through
 
     def add_auth_to_params(self,
-                           params: Dict[str, Any]):
+                           params: Dict[str, Any],
+                           encode_params: bool):
         timestamp = int(self.time_provider.time() * 1e3)
 
         request_params = OrderedDict(params or {})
         request_params["timestamp"] = timestamp
 
-        signature = self._generate_signature(params=request_params)
+        signature = self._generate_signature(params=request_params, encode_params=encode_params)
         request_params["signature"] = signature
 
         return request_params
 
-    def header_for_authentication(self) -> Dict[str, str]:
-        return {"X-MEXC-APIKEY": self.api_key, "Content-Type": "application/json"}
-
-    def _generate_signature(self, params: Dict[str, Any]) -> str:
-
-        encoded_params_str = urlencode(params)
+    def _generate_signature(self, params: Dict[str, Any], encode_params: bool) -> str:
+        if encode_params:
+            encoded_params_str = urlencode(params)
+        else:
+            encoded_params_str = "&".join([f"{key}={value}" for key, value in params.items()])
         digest = hmac.new(self.secret_key.encode("utf8"), encoded_params_str.encode("utf8"), hashlib.sha256).hexdigest()
         return digest
