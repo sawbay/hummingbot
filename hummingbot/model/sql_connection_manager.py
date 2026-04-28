@@ -87,7 +87,12 @@ class SQLConnectionManager(TransactionBase):
                         if not self._engine.dialect.supports_alter:
                             continue
                         for fkc in fkcs:
-                            fk_constraint = ForeignKeyConstraint((), (), name=fkc)
+                            # SQLAlchemy may return `(table_name, constraint_name)` tuples here.
+                            # `DropConstraint` expects the actual constraint name, not the tuple.
+                            constraint_name = fkc[-1] if isinstance(fkc, (tuple, list)) else fkc
+                            if not constraint_name:
+                                continue
+                            fk_constraint = ForeignKeyConstraint((), (), name=constraint_name)
                             Table(tname, MetaData(), fk_constraint)
                             conn.execute(DropConstraint(fk_constraint))
 
