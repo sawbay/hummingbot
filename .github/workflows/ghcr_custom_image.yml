@@ -47,8 +47,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ steps.image.outputs.name }}:custom
-            ${{ steps.image.outputs.name }}:custom-${{ github.sha }}
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
           build-args: |
             BRANCH=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
