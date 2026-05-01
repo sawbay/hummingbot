@@ -6,4 +6,5 @@ Keep this file short. Put detailed repo knowledge in `docs/`.
 
 - One bot instance runs at most one active strategy or script.
 - Strategy V2 can orchestrate multiple controllers and executors under that one strategy.
-- Detailed notes: `docs/hummingbot-runtime-notes.md`.
+- Architecture overview: `docs/architecture-overview.md`.
+- MQTT details: `docs/mqtt.md`.
