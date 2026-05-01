@@ -785,32 +785,37 @@ class MQTTGateway(Node):
     async def _restart_gateway(self):
         self._hb_app.logger().warning('MQTT Gateway is disconnected, attempting to reconnect.')
 
+        replacement_gateway = None
         try:
             self._restarting = True
             self.stop(False)
             await asyncio.sleep(self._INTERVAL_RESTART_SHORT)
 
-            self._publishers = []
-            self._subscribers = []
-            self._rpc_services = []
-            # self._rpc_clients = []
-
-            self.start(False)
+            replacement_gateway = self.__class__(self._hb_app)
+            replacement_gateway._initial_connection_succeeded = True
+            replacement_gateway.start(False)
             if self._hb_app.strategy is not None:
-                self.start_market_events_fw()
+                replacement_gateway.start_market_events_fw()
 
             await asyncio.sleep(self._INTERVAL_RESTART_SHORT)
 
-            self._restarting = False
+            replacement_gateway._health = await replacement_gateway._ev_loop.run_in_executor(
+                None, replacement_gateway._check_connections)
 
-            self._health = await self._ev_loop.run_in_executor(
-                None, self._check_connections)
-
-            if self._health:
+            if replacement_gateway._health:
+                self._hb_app._mqtt = replacement_gateway
+                replacement_gateway._start_health_monitoring_loop()
+                self._stop_health_monitoring_loop()
                 self._hb_app.logger().warning('MQTT Gateway successfully reconnected.')
+            else:
+                replacement_gateway.stop(False)
 
         except Exception as e:
+            if replacement_gateway is not None:
+                replacement_gateway.stop(False)
             self._hb_app.logger().error(f'MQTT Gateway failed to reconnect: {e}. Sleeping 10 seconds before retry.')
+        finally:
+            self._restarting = False
 
         await asyncio.sleep(self._INTERVAL_RESTART_LONG)
 
