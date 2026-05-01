@@ -105,6 +105,9 @@ class RemoteIfaceMQTTTests(TestCase):
     def tearDown(self):
         self.async_loop.run_until_complete(asyncio.sleep(0.1))
         self.gateway.stop()
+        if self.hbapp._mqtt is not None and self.hbapp._mqtt is not self.gateway:
+            self.hbapp._mqtt.stop()
+            self.hbapp._mqtt = None
         del self.gateway
         self.async_loop.run_until_complete(asyncio.sleep(0.1))
         self.fake_mqtt_broker.clear()
@@ -694,6 +697,7 @@ class RemoteIfaceMQTTTests(TestCase):
                 "MQTT Gateway successfully reconnected.",
             )
         )
+        self.assertIsNot(self.gateway, self.hbapp._mqtt)
 
     def test_mqtt_gateway_stop(self):
         self.start_mqtt()
