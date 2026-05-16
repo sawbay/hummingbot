@@ -146,23 +146,22 @@ class MQTTCommands:
         response = StartCommandMessage.Response()
         timeout = 30
         try:
-            if self._hb_app.strategy_name is None and msg.script is None:
+            v2_conf = msg.v2_conf or msg.conf
+            if self._hb_app.strategy_name is None and v2_conf is None:
                 raise Exception('Strategy check: Please import or create a strategy.')
             if self._hb_app.strategy is not None:
                 raise Exception('The bot is already running - please run "stop" first')
             if msg.async_backend:
                 self._hb_app.start(
                     log_level=msg.log_level,
-                    script=msg.script,
-                    conf=msg.conf,
+                    v2_conf=v2_conf,
                     is_quickstart=msg.is_quickstart
                 )
             else:
                 res = call_sync(
                     self._hb_app.start_check(
                         log_level=msg.log_level,
-                        script=msg.script,
-                        conf=msg.conf,
+                        v2_conf=v2_conf,
                         is_quickstart=msg.is_quickstart
                     ),
                     loop=self._ev_loop,
