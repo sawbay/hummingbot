@@ -56,7 +56,8 @@ RPC command/query topics:
 ## RPC Command/Query Payloads
 
 - `.../start`
-  - Request keys: `log_level`, `script`, `conf`, `is_quickstart`, `async_backend`
+  - Request keys: `log_level`, `v2_conf`, `is_quickstart`, `async_backend`
+  - Backward-compatible request key: `conf` is treated as `v2_conf`
   - Response keys: `status`, `msg`
 - `.../stop`
   - Request keys: `skip_order_cancellation`, `async_backend`

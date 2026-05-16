@@ -214,6 +214,10 @@ class RemoteIfaceMQTTTests(TestCase):
 
         self.fake_mqtt_broker.publish_to_subscription(import_topic, {'strategy': strategy_name})
 
+    def send_fake_start_cmd(self, payload):
+        start_topic = self.get_topic_for(self.START_URI)
+        self.fake_mqtt_broker.publish_to_subscription(start_topic, payload)
+
     @staticmethod
     def emit_order_created_event(
             market: MockPaperExchange,
@@ -452,6 +456,42 @@ class RemoteIfaceMQTTTests(TestCase):
                                   empty_name=True)
         self.async_run_with_timeout(self.wait_for_rcv(topic, msg, msg_key='data'), timeout=10)
         self.assertTrue(self.is_msg_received(topic, msg, msg_key='data'))
+
+    def test_mqtt_command_start_accepts_v2_conf(self):
+        self.start_mqtt()
+        with patch.object(self.hbapp, "start") as start_mock:
+            self.send_fake_start_cmd({
+                "log_level": "INFO",
+                "v2_conf": "bot_1.yml",
+                "is_quickstart": True,
+                "async_backend": True,
+            })
+
+        start_mock.assert_called_once_with(
+            log_level="INFO",
+            v2_conf="bot_1.yml",
+            is_quickstart=True
+        )
+        topic = f"test_reply/hbot/{self.instance_id}/start"
+        msg = {'status': 200, 'msg': ''}
+        self.async_run_with_timeout(self.wait_for_rcv(topic, msg, msg_key='data'), timeout=10)
+        self.assertTrue(self.is_msg_received(topic, msg, msg_key='data'))
+
+    def test_mqtt_command_start_treats_conf_as_v2_conf(self):
+        self.start_mqtt()
+        with patch.object(self.hbapp, "start") as start_mock:
+            self.send_fake_start_cmd({
+                "log_level": "INFO",
+                "conf": "bot_1.yml",
+                "is_quickstart": True,
+                "async_backend": True,
+            })
+
+        start_mock.assert_called_once_with(
+            log_level="INFO",
+            v2_conf="bot_1.yml",
+            is_quickstart=True
+        )
 
     @patch("hummingbot.client.command.status_command.StatusCommand.strategy_status", new_callable=AsyncMock)
     def test_mqtt_command_status_no_strategy_running(
